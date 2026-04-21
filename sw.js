@@ -1,4 +1,4 @@
-const CACHE = 'gymapp-v1';
+const CACHE = 'MisRutinas-v1';
 const ASSETS = ['./index.html', './manifest.json', './icon.svg', './sw.js'];
 
 self.addEventListener('install', e => {
