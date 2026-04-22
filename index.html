@@ -1264,8 +1264,6 @@ function goTo(id) {
     if (!editingRid) document.getElementById('add-title').textContent = 'NUEVA RUTINA';
     renderCards();
   }
-  // Registrar en el historial para que el gesto "atrás" de Android funcione
-  if (id !== 's-home') history.pushState({scrId: id}, '');
 }
 
 // ─── MODO GESTIÓN ────────────────────────────────────────────
@@ -1789,74 +1787,57 @@ loadFromStorage();
 renderHome();
 
 // ─── BOTÓN ATRÁS / GESTO ANDROID ─────────────────────────────
-// Estado inicial del historial
-history.replaceState({scrId: 's-home'}, '');
+// Estrategia: mantener siempre un estado "guardia" en el historial.
+// Cada vez que el gesto lo consume, lo reponemos de inmediato.
+// Así el gesto nunca sale de la app y nosotros controlamos la navegación.
+history.pushState({guard: true}, '');
 
 window.addEventListener('popstate', () => {
+  // Reponer el estado guardia inmediatamente para bloquear salidas futuras
+  history.pushState({guard: true}, '');
+
   const cur = document.querySelector('.scr.on')?.id;
 
-  // 1. Cerrar picker de ejercicios (dentro de settings) si está abierto
-  const settPicker = document.getElementById('sett-picker');
-  if (settPicker?.classList.contains('show')) {
-    showSettingsMain();
-    history.pushState({scrId: cur}, '');
-    return;
+  // 1. Cerrar picker de ejercicios dentro de settings
+  if (document.getElementById('sett-picker')?.classList.contains('show')) {
+    showSettingsMain(); return;
   }
-  // 2. Cerrar panel de confirmación de settings
-  const settConfirm = document.getElementById('sett-confirm');
-  if (settConfirm?.classList.contains('show')) {
-    showSettingsMain();
-    history.pushState({scrId: cur}, '');
-    return;
+  // 2. Cerrar confirmación dentro de settings
+  if (document.getElementById('sett-confirm')?.classList.contains('show')) {
+    showSettingsMain(); return;
   }
   // 3. Cerrar cualquier overlay visible
-  const overlayIds = ['photo-ov','settings-ov','sess-ov','discard-sess-ov','discard-add-ov'];
-  for (const oid of overlayIds) {
+  for (const oid of ['photo-ov','settings-ov','sess-ov','discard-sess-ov','discard-add-ov']) {
     const el = document.getElementById(oid);
-    if (el?.classList.contains('show')) {
-      el.classList.remove('show');
-      history.pushState({scrId: cur}, '');
-      return;
-    }
+    if (el?.classList.contains('show')) { el.classList.remove('show'); return; }
   }
-  // 4. Cerrar confirmación de borrado de rutina si está visible
+  // 4. Cerrar confirmación de borrado de rutina
   const coEls = [...document.querySelectorAll('.co.show')];
-  if (coEls.length) {
-    coEls.forEach(el => el.classList.remove('show'));
-    history.pushState({scrId: cur}, '');
-    return;
-  }
+  if (coEls.length) { coEls.forEach(el => el.classList.remove('show')); return; }
 
   // 5. Navegar atrás según pantalla actual
   if (cur === 's-sel') {
-    // Selector → volver a crear/editar (sin pushState, el historial ya apunta a s-add)
     document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
     document.getElementById('s-add').classList.add('on');
     renderCards();
   } else if (cur === 's-add') {
     const hasName = document.getElementById('rname').value.trim() !== '';
     if (nex.length > 0 || hasName) {
-      // Hay cambios: mostrar confirmación de descarte
       document.getElementById('discard-add-title').textContent = editingRid ? '¿Descartar los cambios?' : '¿Descartar la rutina?';
       document.getElementById('discard-add-sub').textContent = editingRid ? 'Los cambios no se guardarán.' : 'Perderás el nombre y los ejercicios añadidos.';
       document.getElementById('discard-add-ov').classList.add('show');
-      history.pushState({scrId: 's-add'}, '');
     } else {
       editingRid = null;
-      document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
-      document.getElementById('s-home').classList.add('on');
+      goTo('s-home');
     }
   } else if (cur === 's-detail') {
     if (hasEdits()) {
-      // Hay pesos introducidos: pedir confirmación
       document.getElementById('discard-sess-ov').classList.add('show');
-      history.pushState({scrId: 's-detail'}, '');
     } else {
-      document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
-      document.getElementById('s-home').classList.add('on');
+      goTo('s-home');
     }
   }
-  // cur === 's-home': comportamiento nativo → Android cierra la app
+  // cur === 's-home': no hacer nada, la app no sale
 });
 </script>
 </body>
