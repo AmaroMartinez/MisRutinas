@@ -1255,10 +1255,18 @@ function hasEdits() {
 }
 function gcy(e) { return e.touches ? e.touches[0].clientY : e.clientY; }
 
-// ─── GESTIÓN DEL HISTORIAL (gesto atrás desactivado) ─────────
-// Se empujan varias guardias para que la animación predictiva de Android
-// no pueda consumirlas todas antes de que el popstate llegue a JS.
-// En cada popstate se reponee una guardia, manteniendo el buffer.
+// ─── GESTO ATRÁS DESACTIVADO ─────────────────────────────────
+// Doble barrera para cubrir todas las versiones de Chrome en Android:
+//
+// 1) Navigation API (Chrome 102+, Android 13+ predictive back):
+//    Intercepta el traverse ANTES de que Chrome ejecute la animación.
+if ('navigation' in window) {
+  navigation.addEventListener('navigate', e => {
+    if (e.navigationType === 'traverse') e.preventDefault();
+  });
+}
+// 2) History API fallback: buffer de guardias para versiones más antiguas.
+//    El popstate repone la guardia consumida, el gesto nunca llega al fondo.
 for (let i = 0; i < 10; i++) history.pushState({guard: true}, '');
 
 // ─── NAVEGACIÓN ──────────────────────────────────────────────

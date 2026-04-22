@@ -1,4 +1,4 @@
-const CACHE = 'MisRutinas-v2';
+const CACHE = 'MisRutinas-v3';
 const ASSETS = ['./index.html', './manifest.json', './icon.svg', './sw.js'];
 
 self.addEventListener('install', e => {
