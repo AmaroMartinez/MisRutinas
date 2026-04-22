@@ -1020,7 +1020,6 @@ function showPhoto(exId, exName) {
   img.onerror = () => { loader.textContent='Imagen no disponible'; };
   img.src = IMG_BASE + key + '/0.jpg';
   ov.classList.add('show');
-  if (!_guardInHistory) _pushGuard(); // Garantizar guardia para bloquear el gesto atrás
 }
 function closePhoto() {
   document.getElementById('photo-ov').classList.remove('show');
@@ -1063,15 +1062,10 @@ function onBadgeClick() { if (manageMode) openSettings(); }
 function openSettings() {
   showSettingsMain();
   document.getElementById('settings-ov').classList.add('show');
-  // Empujar guardia para que el gesto atrás cierre settings en lugar de salir de la app
-  if (!_guardInHistory) _pushGuard();
 }
 function closeSettings() {
   document.getElementById('settings-ov').classList.remove('show');
   pendingAction = null;
-  // Si se cierra con el botón "Cerrar" (no con gesto atrás), consumir la guardia
-  // para que el próximo gesto atrás desde home cierre la app directamente.
-  _consumeGuard();
 }
 function showSettingsMain() {
   document.getElementById('sett-main').style.display = 'flex';
@@ -1261,32 +1255,11 @@ function hasEdits() {
 }
 function gcy(e) { return e.touches ? e.touches[0].clientY : e.clientY; }
 
-// ─── GESTIÓN DEL HISTORIAL (gesto atrás) ─────────────────────
-// La guardia se empuja solo cuando se entra en una pantalla no-home.
-// Cuando se vuelve a home se consume la guardia para que el siguiente
-// gesto atrás cierre la app directamente.
-let _guardInHistory = false;   // ¿Hay una entrada guardia en el historial?
-let _skipNextPopstate = false; // ¿El próximo popstate es nuestra limpieza interna?
-
-function _pushGuard() {
-  history.pushState({guard: true}, '');
-  _guardInHistory = true;
-}
-function _consumeGuard() {
-  // Llama a history.back() para eliminar la guardia.
-  // Usa el flag _skipNextPopstate para ignorar ese popstate en el handler.
-  if (_guardInHistory) {
-    _guardInHistory = false;
-    _skipNextPopstate = true;
-    history.back();
-  }
-}
-// Navegación de vuelta a home: cambia la pantalla y elimina la guardia
-// para que el siguiente gesto atrás del usuario cierre la app.
-function _goHome() {
-  goTo('s-home');
-  _consumeGuard();
-}
+// ─── GESTIÓN DEL HISTORIAL (gesto atrás desactivado) ─────────
+// Se mantiene siempre una entrada guardia en el historial.
+// Cada vez que el gesto atrás la consume, se re-empuja de inmediato.
+// Resultado: el gesto atrás no hace absolutamente nada en toda la app.
+history.pushState({guard: true}, '');
 
 // ─── NAVEGACIÓN ──────────────────────────────────────────────
 function goTo(id) {
@@ -1297,9 +1270,6 @@ function goTo(id) {
     ['discard-sess-ov', 'sess-ov', 'discard-add-ov', 'photo-ov'].forEach(oid => {
       document.getElementById(oid)?.classList.remove('show');
     });
-  } else if (!_guardInHistory) {
-    // Al entrar en cualquier pantalla no-home, asegurar que hay guardia
-    _pushGuard();
   }
   if (id === 's-sel') renderSel();
   if (id === 's-add') {
@@ -1334,12 +1304,11 @@ function toggleManage() {
 function tryGoBack() {
   if (hasEdits()) {
     document.getElementById('discard-sess-ov').classList.add('show');
-    if (!_guardInHistory) _pushGuard();
-  } else _goHome();
+  } else goTo('s-home');
 }
 function discardAndGoBack() {
   document.getElementById('discard-sess-ov').classList.remove('show');
-  _goHome();
+  goTo('s-home');
 }
 
 function openDetail(rid) {
@@ -1425,7 +1394,6 @@ function showSessConfirm() {
     lines.appendChild(row);
   });
   document.getElementById('sess-ov').classList.add('show');
-  if (!_guardInHistory) _pushGuard(); // Garantizar guardia para bloquear el gesto atrás
 }
 
 function confirmSave() {
@@ -1439,7 +1407,7 @@ function confirmSave() {
   });
   saveToStorage();
   document.getElementById('sess-ov').classList.remove('show');
-  _goHome();
+  goTo('s-home');
 }
 
 // ─── CREAR / EDITAR RUTINA ────────────────────────────────────
@@ -1449,10 +1417,9 @@ function tryCancelAdd() {
     document.getElementById('discard-add-title').textContent = editingRid ? '¿Descartar los cambios?' : '¿Descartar la rutina?';
     document.getElementById('discard-add-sub').textContent = editingRid ? 'Los cambios no se guardarán.' : 'Perderás el nombre y los ejercicios añadidos.';
     document.getElementById('discard-add-ov').classList.add('show');
-    if (!_guardInHistory) _pushGuard();
   } else {
     editingRid = null;
-    _goHome();
+    goTo('s-home');
   }
 }
 
@@ -1462,7 +1429,7 @@ function discardAndCancelAdd() {
   document.getElementById('rname').value = '';
   editingRid = null;
   updStats(); updSave(); renderCards();
-  _goHome();
+  goTo('s-home');
 }
 
 function startEditRoutine(rid) {
@@ -1490,7 +1457,7 @@ function saveRoutine() {
   nex = [];
   document.getElementById('rname').value = '';
   renderCards(); renderHome();
-  _goHome();
+  goTo('s-home');
 }
 
 function updSave() {
@@ -1576,7 +1543,7 @@ function attachSwipe(swInner, rid) {
     card.style.transition = 'transform .2s ease';
     hDel.style.opacity = 0; hEdit.style.opacity = 0;
     if (!manageMode) { card.style.transform = 'translateX(0)'; return; }
-    if (cx < -T) { card.style.transform = 'translateX(0)'; setTimeout(() => { ov.classList.add('show'); if (!_guardInHistory) _pushGuard(); }, 180); }
+    if (cx < -T) { card.style.transform = 'translateX(0)'; setTimeout(() => { ov.classList.add('show'); }, 180); }
     else if (cx > T) { card.style.transform = 'translateX(0)'; setTimeout(() => startEditRoutine(rid), 180); }
     else card.style.transform = 'translateX(0)';
   };
@@ -1609,11 +1576,9 @@ function attachSwipe(swInner, rid) {
     routines = routines.filter(r => r.id !== rid);
     saveToStorage();
     renderHome();
-    _consumeGuard(); // Cerrar el dialog también consume la guardia
   });
   ov.querySelector('.co-c').addEventListener('click', () => {
     ov.classList.remove('show');
-    _consumeGuard(); // Cancelar también consume la guardia empujada por el "do-nothing"
   });
 }
 
@@ -1837,67 +1802,11 @@ loadFromStorage();
 renderHome();
 
 // ─── BOTÓN ATRÁS / GESTO ANDROID ─────────────────────────────
-// Sin guardia inicial: la app arranca en home y el gesto atrás desde
-// home cierra la app. La guardia solo existe cuando hay una pantalla
-// no-home activa o un overlay que requiere interceptar el gesto.
-
+// El gesto atrás de Android está desactivado en toda la app.
+// Cada vez que el gesto consume la guardia del historial, se re-empuja
+// de inmediato, de modo que nunca ocurre ninguna acción.
 window.addEventListener('popstate', () => {
-  // Ignorar popstates generados por nuestra propia limpieza interna
-  if (_skipNextPopstate) { _skipNextPopstate = false; return; }
-
-  // La guardia fue consumida por el gesto del usuario
-  _guardInHistory = false;
-
-  // ── PANELS DE SETTINGS (visibles sobre cualquier pantalla) ──
-  if (document.getElementById('sett-picker')?.classList.contains('show')) {
-    // Picker → volver al panel principal de settings
-    showSettingsMain(); _pushGuard(); return;
-  }
-  if (document.getElementById('sett-confirm')?.classList.contains('show')) {
-    // Confirmación → usar el handler del botón "Cancelar" (puede ser showSettingsMain u openExPicker)
-    const fn = document.getElementById('sett-confirm-back-btn')?.onclick;
-    (typeof fn === 'function' ? fn : showSettingsMain)();
-    _pushGuard(); return;
-  }
-  if (document.getElementById('settings-ov')?.classList.contains('show')) {
-    // Panel principal → cerrar settings, volvemos a home sin guardia
-    document.getElementById('settings-ov').classList.remove('show');
-    pendingAction = null;
-    return; // no re-empujar: el próximo gesto atrás cierra la app
-  }
-
-  const cur = document.querySelector('.scr.on')?.id;
-
-  // ── HOME: dejar que el gesto cierre la app ──
-  if (cur === 's-home') return;
-
-  // ── OVERLAY DE FOTO: cerrarlo ──
-  if (document.getElementById('photo-ov')?.classList.contains('show')) {
-    closePhoto(); _pushGuard(); return;
-  }
-
-  // ── CONFIRMACIONES: no hacer nada (el gesto no navega ni cierra el diálogo) ──
-  const esConfirmacion =
-    ['discard-sess-ov', 'discard-add-ov', 'sess-ov'].some(id =>
-      document.getElementById(id)?.classList.contains('show')) ||
-    document.querySelectorAll('.co.show').length > 0;
-  if (esConfirmacion) { _pushGuard(); return; }
-
-  // ── NAVEGACIÓN POR PANTALLA ──
-  if (cur === 's-sel') {
-    // Selector → volver a crear/editar rutina (goTo empuja guardia)
-    goTo('s-add');
-  } else if (cur === 's-add') {
-    // Crear/editar → igual que pulsar ✕
-    tryCancelAdd();
-    // Si tryCancelAdd mostró un diálogo (sigue en s-add), re-empujar guardia
-    if (document.querySelector('.scr.on')?.id !== 's-home') _pushGuard();
-  } else if (cur === 's-detail') {
-    // Sesión → igual que pulsar el botón de cerrar
-    tryGoBack();
-    // Si tryGoBack mostró un diálogo (sigue en s-detail), re-empujar guardia
-    if (document.querySelector('.scr.on')?.id !== 's-home') _pushGuard();
-  }
+  history.pushState({guard: true}, '');
 });
 </script>
 </body>
