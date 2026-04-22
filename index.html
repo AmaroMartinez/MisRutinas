@@ -1259,6 +1259,12 @@ function gcy(e) { return e.touches ? e.touches[0].clientY : e.clientY; }
 function goTo(id) {
   document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
   document.getElementById(id).classList.add('on');
+  if (id === 's-home') {
+    // Limpiar overlays residuales de otras pantallas para evitar estados inesperados
+    ['discard-sess-ov', 'sess-ov', 'discard-add-ov'].forEach(oid => {
+      document.getElementById(oid)?.classList.remove('show');
+    });
+  }
   if (id === 's-sel') renderSel();
   if (id === 's-add') {
     if (!editingRid) document.getElementById('add-title').textContent = 'NUEVA RUTINA';
@@ -1787,10 +1793,22 @@ loadFromStorage();
 renderHome();
 
 // ─── BOTÓN ATRÁS / GESTO ANDROID ─────────────────────────────
-// Estrategia: mantener siempre un estado "guardia" en el historial.
-// Cada vez que el gesto lo consume, lo reponemos de inmediato.
-// Así el gesto nunca sale de la app y nosotros controlamos la navegación.
+// Estrategia "multi-guardia": empezar con 3 entradas de guardia.
+// Chrome standalone puede consumir guardias con la animación de
+// retroceso ANTES de que el JS reponga el guardia. Con 3 niveles de
+// colchón, aunque se consuman 2 antes de que JS actúe, siempre queda 1,
+// y Chrome nunca llega a la entrada raíz (que desencadena el cierre).
 history.pushState({guard: true}, '');
+history.pushState({guard: true}, '');
+history.pushState({guard: true}, '');
+
+// Si la app vuelve al primer plano tras ser minimizada, reponer el guardia
+// por si el sistema lo consumió mientras estaba en segundo plano.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    history.pushState({guard: true}, '');
+  }
+});
 
 window.addEventListener('popstate', () => {
   // Reponer el estado guardia inmediatamente para bloquear salidas futuras
